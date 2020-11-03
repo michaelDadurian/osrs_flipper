@@ -12,7 +12,17 @@ import cv2 as cv2
 from enum import Enum
 from modules.real_mouse import move_mouse_click
 
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+log = logging.getLogger(__name__)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+log.setLevel(logging.DEBUG)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.ERROR)
+stream_handler.setFormatter(formatter)
+
+log.addHandler(stream_handler)
+
 
 actions_queue = queue.Queue()
 
@@ -60,14 +70,16 @@ class BotInstance:
 
     def run(self):
         self.status = InstanceStatus.RUNNING
-        logging.info("Running instance " + str(self.id))
         self.window_id = create_window(self.window_info)
+
+        log.info("Running instance " + str(self.id))
 
         time.sleep(3)
         take_screenshot(self.window_info, self.screenshots_path + '/login.png')
 
-        logging.info('Logging in user ' + self.acct_info['user'] + ' with pass ' + self.acct_info['pw'])
+        log.info('INSTANCE ' + str(self.id) + ': logging in user ' + self.acct_info['user'])
 
+        # Login user
         loc = None
         while loc is None:
             loc = locate_center('existing_user.png', self.window_info, confidence=.8)
@@ -80,29 +92,41 @@ class BotInstance:
         pyautogui.press('enter')
 
         time.sleep(10)
-        loc = None
-        while loc is None:
-            loc = locate_center('click_to_play.png', self.window_info, confidence=.6)
-    
+
+        loc = locate_center('click_to_play.png', self.window_info, confidence=.6)
         move_mouse_click(loc.x, loc.y)
 
         time.sleep(2)
 
-        logged_in = take_screenshot(self.window_info, self.screenshots_path + '/starting_inventory.png')
+        #logged_in = take_screenshot(self.window_info, self.screenshots_path + '/starting_inventory.png')
 
-        loc = None
-        while loc is None:
-            loc = locate_center('public_chat.png', self.window_info, confidence=.5)
-
-        #loc_center = pyautogui.center(loc)
-        '''
-            turn public chat off
-            examine money
-            capture gp amount from chat box
-        '''
-
+        adjusted_region = self.window_info
+        adjusted_region.size_y += 40
+        # Turn public chat off
+        loc = locate_center('public_on.png', adjusted_region, confidence=.6)
         move_mouse_click(loc.x, loc.y, button='right')
-        move_mouse_click(loc.x, loc.y - 20)
+        move_mouse_click(loc.x, loc.y - 80)
+
+        # Examine money
+        loc = locate_center('money_icon.png', self.window_info, confidence=.7)
+        move_mouse_click(loc.x, loc.y, button='right')
+        move_mouse_click(loc.x, loc.y + 60)
+
+        gp_text_region = self.window_info
+        gp_text_region.location_x += 165
+        gp_text_region.location_y += 505
+        gp_text_region.size_x = 100
+        gp_text_region.size_y = 19
+
+        log.info("Checking gp region")
+        log.info(str(gp_text_region.location_x), str(gp_text_region.location_y), str(gp_text_region.size_x), 
+        str(gp_text_region.size_y))
+        gp_img_path = self.screenshots_path + '/gp_text.png'
+        gp_text_img = take_screenshot(gp_text_region, gp_img_path)
+
+        val = tesser_money_image(gp_img_path)
+        print(val)
+
         '''
         loc = None
         while loc is None:
@@ -116,14 +140,27 @@ class BotInstance:
         #login user
 
 def locate_box(img_name, region, confidence=1):
-    return pyautogui.locateOnScreen(os.getcwd() + '/compare_ss/' + img_name,
+    loc = None
+    log.info("Looking for " + img_name + " box...")
+    while loc is None:
+        loc = pyautogui.locateOnScreen(os.getcwd() + '/compare_ss/' + img_name,
             region=(region.location_x, region.location_y, region.size_x, region.size_y),
             confidence=confidence)
 
+    log.info("Found image")
+    return loc
+
 def locate_center(img_name, region, confidence=1):
-    return pyautogui.locateCenterOnScreen(os.getcwd() + '/compare_ss/' + img_name, 
+    loc = None
+    log.info("Looking for " + img_name + " center...")
+    log.info(str(region.location_x) + ' ' + str(region.location_y) + ' ' + str(region.size_x) + ' ' + str(region.size_y))
+    while loc is None:
+        loc = pyautogui.locateCenterOnScreen(os.getcwd() + '/compare_ss/' + img_name, 
             region=(region.location_x, region.location_y, region.size_x, region.size_y), 
             confidence=confidence)
+    
+    log.info("Found image")
+    return loc
 
 def tesser_money_image(image):
     image = cv2.imread(image, 0)
