@@ -5,6 +5,10 @@ import logging
 import pyautogui
 import os
 import threading, queue
+import numpy
+import PIL
+import pytesseract as pytesseract
+import cv2 as cv2
 from enum import Enum
 from modules.real_mouse import move_mouse_click
 
@@ -66,7 +70,7 @@ class BotInstance:
 
         loc = None
         while loc is None:
-            loc = locate_center('existing_user.png', confidence=.8)
+            loc = locate_center('existing_user.png', self.window_info, confidence=.8)
         
         move_mouse_click(loc.x, loc.y)
 
@@ -78,18 +82,78 @@ class BotInstance:
         time.sleep(10)
         loc = None
         while loc is None:
-            loc = locate_center('click_to_play.png', confidence=.6)
+            loc = locate_center('click_to_play.png', self.window_info, confidence=.6)
     
         move_mouse_click(loc.x, loc.y)
 
+        time.sleep(2)
+
+        logged_in = take_screenshot(self.window_info, self.screenshots_path + '/starting_inventory.png')
+
+        loc = None
+        while loc is None:
+            loc = locate_center('public_chat.png', self.window_info, confidence=.5)
+
+        #loc_center = pyautogui.center(loc)
+        '''
+            turn public chat off
+            examine money
+            capture gp amount from chat box
+        '''
+
+        move_mouse_click(loc.x, loc.y, button='right')
+        move_mouse_click(loc.x, loc.y - 20)
+        '''
+        loc = None
+        while loc is None:
+            loc = locate_box('money_icon.png', region=self.window_info, confidence=.6)
+
+        pyautogui.screenshot('gp_img.png', region=(loc.left-5, loc.top-15, loc.width+5, loc.height-8))
+        val = tesser_money_image('gp_img.png')
+        print(val)
+        '''
         #change world to member or f2p (member=305 f2p=308)
         #login user
 
-def locate_center(img_name, confidence=1):
-    return pyautogui.locateCenterOnScreen(os.getcwd() + '/compare_ss/' + img_name, confidence=confidence)
+def locate_box(img_name, region, confidence=1):
+    return pyautogui.locateOnScreen(os.getcwd() + '/compare_ss/' + img_name,
+            region=(region.location_x, region.location_y, region.size_x, region.size_y),
+            confidence=confidence)
 
+def locate_center(img_name, region, confidence=1):
+    return pyautogui.locateCenterOnScreen(os.getcwd() + '/compare_ss/' + img_name, 
+            region=(region.location_x, region.location_y, region.size_x, region.size_y), 
+            confidence=confidence)
+
+def tesser_money_image(image):
+    image = cv2.imread(image, 0)
+    thresh = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+
+    txt = pytesseract.image_to_string(thresh, lang='eng',config='--psm 7')
+
+    txt = ''.join(txt.split())
+    txt_list = list(txt)
+    
+    for i in range(len(txt_list)):
+        if txt_list[i] in ['o', 'O']:
+            txt_list[i] = '0'
+        elif txt_list[i] in ['l', 'I', 'i']:
+            txt_list[i] = '1'
+        elif txt_list[i] in ['M', 'm']:
+            txt_list[i] = '000000'
+        elif txt_list[i] in ['K', 'k']:
+            txt_list[i] = '000'
+        elif txt_list[i] in ['s', 'S']:
+            txt_list[i] = '5'
+        elif txt_list[i] == 'W':
+            txt_list[i] = '40'
+        
+    print(txt_list)
+    txt = int(''.join(txt_list))
+    return(txt)
+    
 def take_screenshot(window_info, screenshot_path):
-    pyautogui.screenshot(
+    return pyautogui.screenshot(
         screenshot_path,     
         region=(
             window_info.location_x,

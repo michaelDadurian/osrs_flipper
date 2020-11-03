@@ -3,7 +3,7 @@ import random
 import math
 import time
 
-def move_mouse_click(x, y):
+def move_mouse_click(x, y, button='left'):
     """Function to simulate realistic mouse movements in python. The objective of this
      will be to take in coordinates x,y and move them in a realistic manner. We
      will be passing in an x,y,  that is already 'random' so this function will
@@ -19,7 +19,7 @@ def move_mouse_click(x, y):
             # move the mouse to our position and takes the time of our duration just
             # calculated
             pyautogui.moveTo(x, y, duration_of_move, pyautogui.easeInOutQuad)
-            pyautogui.click(None, None)
+            pyautogui.click(None, None, button=button)
             break
         except:
             print('paused for 10 seconds')
